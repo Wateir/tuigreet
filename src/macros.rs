@@ -9,7 +9,9 @@ impl SafeDebug for Request {
     match self {
       msg @ &Request::CancelSession => format!("{:?}", msg),
       msg @ &Request::CreateSession { .. } => format!("{:?}", msg),
-      &Request::PostAuthMessageResponse { .. } => "PostAuthMessageResponse".to_string(),
+      &Request::PostAuthMessageResponse { .. } => {
+        "PostAuthMessageResponse".to_string()
+      },
       msg @ &Request::StartSession { .. } => format!("{:?}", msg),
     }
   }

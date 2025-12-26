@@ -1,16 +1,15 @@
 use crossterm::event::KeyCode;
 use libgreetd_stub::SessionOptions;
 
-use crate::ui::common::masked::MaskedString;
-
 use super::common::IntegrationRunner;
+use crate::ui::common::masked::MaskedString;
 
 #[tokio::test]
 async fn remember_username() {
   let opts = SessionOptions {
     username: "apognu".to_string(),
     password: "password".to_string(),
-    mfa: false,
+    mfa:      false,
   };
 
   let mut runner = IntegrationRunner::new(

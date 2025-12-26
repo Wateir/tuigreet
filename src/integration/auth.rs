@@ -7,7 +7,7 @@ async fn authentication_ok() {
   let opts = SessionOptions {
     username: "apognu".to_string(),
     password: "password".to_string(),
-    mfa: false,
+    mfa:      false,
   };
 
   let mut runner = IntegrationRunner::new(opts, None).await;
@@ -31,7 +31,7 @@ async fn authentication_bad_password() {
   let opts = SessionOptions {
     username: "apognu".to_string(),
     password: "password".to_string(),
-    mfa: false,
+    mfa:      false,
   };
 
   let mut runner = IntegrationRunner::new(opts, None).await;
@@ -60,7 +60,7 @@ async fn authentication_ok_mfa() {
   let opts = SessionOptions {
     username: "apognu".to_string(),
     password: "password".to_string(),
-    mfa: true,
+    mfa:      true,
   };
 
   let mut runner = IntegrationRunner::new(opts, None).await;
@@ -86,7 +86,7 @@ async fn authentication_bad_mfa() {
   let opts = SessionOptions {
     username: "apognu".to_string(),
     password: "password".to_string(),
-    mfa: true,
+    mfa:      true,
   };
 
   let mut runner = IntegrationRunner::new(opts, None).await;

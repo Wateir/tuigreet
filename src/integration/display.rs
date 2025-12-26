@@ -10,7 +10,7 @@ async fn show_greet() {
   let opts = SessionOptions {
     username: "apognu".to_string(),
     password: "password".to_string(),
-    mfa: false,
+    mfa:      false,
   };
 
   let mut runner = IntegrationRunner::new(
@@ -39,7 +39,7 @@ async fn show_wrapped_greet() {
   let opts = SessionOptions {
     username: "apognu".to_string(),
     password: "password".to_string(),
-    mfa: false,
+    mfa:      false,
   };
 
   let mut runner = IntegrationRunner::new_with_size(
@@ -80,7 +80,7 @@ async fn show_time() {
   let opts = SessionOptions {
     username: "apognu".to_string(),
     password: "password".to_string(),
-    mfa: false,
+    mfa:      false,
   };
 
   let tref = Local::now().format(&TIME_FORMAT).to_string();

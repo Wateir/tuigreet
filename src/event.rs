@@ -1,14 +1,12 @@
 use std::time::Duration;
 
+#[cfg(not(test))] use crossterm::event::EventStream;
 use crossterm::event::{Event as TermEvent, KeyEvent};
-use futures::{future::FutureExt, StreamExt};
+use futures::{StreamExt, future::FutureExt};
 use tokio::{
   process::Command,
   sync::mpsc::{self, Sender},
 };
-
-#[cfg(not(test))]
-use crossterm::event::EventStream;
 
 use crate::AuthStatus;
 
@@ -42,7 +40,8 @@ impl Events {
         #[cfg(test)]
         let mut stream = futures::stream::pending::<Result<TermEvent, ()>>();
 
-        let mut render_interval = tokio::time::interval(Duration::from_secs_f64(1.0 / FRAME_RATE));
+        let mut render_interval =
+          tokio::time::interval(Duration::from_secs_f64(1.0 / FRAME_RATE));
 
         loop {
           let render = render_interval.tick();

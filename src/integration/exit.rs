@@ -8,7 +8,7 @@ async fn exit() {
   let opts = SessionOptions {
     username: "apognu".to_string(),
     password: "password".to_string(),
-    mfa: false,
+    mfa:      false,
   };
 
   let mut runner = IntegrationRunner::new(opts, None).await;
@@ -17,7 +17,9 @@ async fn exit() {
     let mut runner = runner.clone();
 
     async move {
-      runner.send_modified_key(KeyCode::Char('x'), KeyModifiers::CONTROL).await;
+      runner
+        .send_modified_key(KeyCode::Char('x'), KeyModifiers::CONTROL)
+        .await;
       runner.wait_for_render().await;
     }
   });

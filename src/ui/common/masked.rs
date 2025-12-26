@@ -3,7 +3,7 @@ use zeroize::Zeroize;
 #[derive(Default)]
 pub struct MaskedString {
   pub value: String,
-  pub mask: Option<String>,
+  pub mask:  Option<String>,
 }
 
 impl MaskedString {
@@ -42,7 +42,8 @@ mod tests {
 
   #[test]
   fn get_mask_when_masked() {
-    let masked = MaskedString::from("value".to_string(), Some("mask".to_string()));
+    let masked =
+      MaskedString::from("value".to_string(), Some("mask".to_string()));
 
     assert_eq!(masked.get(), "mask");
   }
