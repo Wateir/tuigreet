@@ -17,7 +17,7 @@ mkShell {
     cargo
 
     # Tools
-    rustfmt
+    (rustfmt.override {asNightly = true;})
     clippy
     cargo
     taplo
