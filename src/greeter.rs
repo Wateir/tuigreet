@@ -119,11 +119,12 @@ pub struct Greeter {
   pub logger:  Option<WorkerGuard>,
 
   #[default(DEFAULT_LOCALE)]
-  pub locale: Locale,
-  pub config: Option<Matches>,
-  pub socket: String,
-  pub stream: Option<Arc<RwLock<UnixStream>>>,
-  pub events: Option<Sender<Event>>,
+  pub locale:        Locale,
+  pub config:        Option<Matches>,
+  pub loaded_config: Option<crate::config::Config>, // store loaded TOML config
+  pub socket:        String,
+  pub stream:        Option<Arc<RwLock<UnixStream>>>,
+  pub events:        Option<Sender<Event>>,
 
   // Current mode of the application, will define what actions are permitted.
   pub mode:          Mode,
@@ -240,6 +241,53 @@ impl Greeter {
         process::exit(1);
       }
 
+      // Load configuration after CLI parsing
+      if !greeter.config().opt_present("no-config") {
+        let config_path = greeter
+          .config()
+          .opt_str("config")
+          .map(std::path::PathBuf::from);
+        match crate::config::parser::load_config(config_path.as_deref()) {
+          Ok(mut config) => {
+            // Apply environment variables
+            crate::config::env::apply_env_vars(&mut config);
+
+            // Validate config
+            match config.validate(false) {
+              Ok(warnings) => {
+                for warning in warnings {
+                  tracing::warn!("Config warning: {}", warning);
+                }
+              },
+              Err(e) => {
+                tracing::warn!("Config validation failed: {}", e);
+              },
+            }
+
+            // Apply config to greeter
+            greeter.apply_config(&config);
+
+            // Apply theme config
+            let cli_theme = greeter.config().opt_str("theme");
+            greeter.apply_theme_config(&config.theme, cli_theme.as_deref());
+
+            // Store config for later use
+            greeter.loaded_config = Some(config.clone());
+
+            // Handle --dump-config
+            if greeter.config().opt_present("dump-config") {
+              let toml_str = toml::to_string_pretty(&config)
+                .unwrap_or_else(|_| "# Failed to serialize config".to_string());
+              println!("{}", toml_str);
+              process::exit(0);
+            }
+          },
+          Err(e) => {
+            tracing::warn!("Failed to load config: {}", e);
+          },
+        }
+      }
+
       greeter.connect().await;
     }
 
@@ -247,10 +295,10 @@ impl Greeter {
 
     let sessions = get_sessions(&greeter).unwrap_or_default();
 
-    if let SessionSource::None = greeter.session_source {
-      if !sessions.is_empty() {
-        greeter.session_source = SessionSource::Session(0);
-      }
+    if let SessionSource::None = greeter.session_source
+      && !sessions.is_empty()
+    {
+      greeter.session_source = SessionSource::Session(0);
     }
 
     greeter.sessions = Menu {
@@ -260,29 +308,29 @@ impl Greeter {
     };
 
     // If we should remember the last logged-in user.
-    if greeter.remember {
-      if let Some(username) = get_last_user_username() {
-        greeter.username = MaskedString::from(username, get_last_user_name());
+    if greeter.remember
+      && let Some(username) = get_last_user_username()
+    {
+      greeter.username = MaskedString::from(username, get_last_user_name());
 
-        // If, on top of that, we should remember their last session.
-        if greeter.remember_user_session {
-          // See if we have the last free-form command from the user.
-          if let Ok(command) = get_last_user_command(greeter.username.get()) {
-            greeter.session_source = SessionSource::Command(command);
-          }
+      // If, on top of that, we should remember their last session.
+      if greeter.remember_user_session {
+        // See if we have the last free-form command from the user.
+        if let Ok(command) = get_last_user_command(greeter.username.get()) {
+          greeter.session_source = SessionSource::Command(command);
+        }
 
-          // If a session was saved, use it and its name.
-          if let Ok(ref session_path) =
-            get_last_user_session(greeter.username.get())
-          {
-            // Set the selected menu option and the session source.
-            if let Some(index) = greeter.sessions.options.iter().position(
-              |Session { path, .. }| path.as_deref() == Some(session_path),
-            ) {
-              greeter.sessions.selected = index;
-              greeter.session_source =
-                SessionSource::Session(greeter.sessions.selected);
-            }
+        // If a session was saved, use it and its name.
+        if let Ok(ref session_path) =
+          get_last_user_session(greeter.username.get())
+        {
+          // Set the selected menu option and the session source.
+          if let Some(index) = greeter.sessions.options.iter().position(
+            |Session { path, .. }| path.as_deref() == Some(session_path),
+          ) {
+            greeter.sessions.selected = index;
+            greeter.session_source =
+              SessionSource::Session(greeter.sessions.selected);
           }
         }
       }
@@ -295,14 +343,14 @@ impl Greeter {
           SessionSource::Command(command.trim().to_string());
       }
 
-      if let Ok(ref session_path) = get_last_session_path() {
-        if let Some(index) = greeter.sessions.options.iter().position(
+      if let Ok(ref session_path) = get_last_session_path()
+        && let Some(index) = greeter.sessions.options.iter().position(
           |Session { path, .. }| path.as_deref() == Some(session_path),
-        ) {
-          greeter.sessions.selected = index;
-          greeter.session_source =
-            SessionSource::Session(greeter.sessions.selected);
-        }
+        )
+      {
+        greeter.sessions.selected = index;
+        greeter.session_source =
+          SessionSource::Session(greeter.sessions.selected);
       }
     }
 
@@ -376,10 +424,10 @@ impl Greeter {
   // Returns the width of the main window where content is displayed from the
   // provided arguments.
   pub fn width(&self) -> u16 {
-    if let Some(value) = self.option("width") {
-      if let Ok(width) = value.parse::<u16>() {
-        return width;
-      }
+    if let Some(value) = self.option("width")
+      && let Ok(width) = value.parse::<u16>()
+    {
+      return width;
     }
 
     80
@@ -387,10 +435,18 @@ impl Greeter {
 
   // Returns the padding of the screen from the provided arguments.
   pub fn window_padding(&self) -> u16 {
-    if let Some(value) = self.option("window-padding") {
-      if let Ok(padding) = value.parse::<u16>() {
-        return padding;
-      }
+    // Check CLI override first
+    if let Some(value) = self.option("window-padding")
+      && let Ok(padding) = value.parse::<u16>()
+    {
+      return padding;
+    }
+
+    // Then check loaded config
+    if let Some(ref config) = self.loaded_config
+      && config.layout.window_padding != 0
+    {
+      return config.layout.window_padding;
     }
 
     0
@@ -399,10 +455,18 @@ impl Greeter {
   // Returns the padding of the main window where content is displayed from the
   // provided arguments.
   pub fn container_padding(&self) -> u16 {
-    if let Some(value) = self.option("container-padding") {
-      if let Ok(padding) = value.parse::<u16>() {
-        return padding + 1;
-      }
+    // Check CLI override first
+    if let Some(value) = self.option("container-padding")
+      && let Ok(padding) = value.parse::<u16>()
+    {
+      return padding + 1;
+    }
+
+    // Then check loaded config
+    if let Some(ref config) = self.loaded_config
+      && config.layout.container_padding != 1
+    {
+      return config.layout.container_padding + 1;
     }
 
     2
@@ -410,10 +474,18 @@ impl Greeter {
 
   // Returns the spacing between each prompt from the provided arguments.
   pub fn prompt_padding(&self) -> u16 {
-    if let Some(value) = self.option("prompt-padding") {
-      if let Ok(padding) = value.parse::<u16>() {
-        return padding;
-      }
+    // Check CLI override first
+    if let Some(value) = self.option("prompt-padding")
+      && let Ok(padding) = value.parse::<u16>()
+    {
+      return padding;
+    }
+
+    // Then check loaded config
+    if let Some(ref config) = self.loaded_config
+      && config.layout.prompt_padding != 1
+    {
+      return config.layout.prompt_padding;
     }
 
     1
@@ -616,6 +688,10 @@ impl Greeter {
       "[1-12]",
     );
 
+    opts.optopt("", "config", "path to configuration file", "PATH");
+    opts.optflag("", "no-config", "disable loading configuration files");
+    opts.optflag("", "dump-config", "print effective configuration and exit");
+
     opts
   }
 
@@ -661,10 +737,10 @@ impl Greeter {
       );
     }
 
-    if self.config().opt_present("theme") {
-      if let Some(spec) = self.config().opt_str("theme") {
-        self.theme = Theme::parse(spec.as_str());
-      }
+    if self.config().opt_present("theme")
+      && let Some(spec) = self.config().opt_str("theme")
+    {
+      self.theme = Theme::parse(spec.as_str());
     }
 
     if self.config().opt_present("asterisks") {
@@ -851,6 +927,150 @@ impl Greeter {
       None => 0,
       Some(prompt) => prompt.chars().count(),
     }
+  }
+
+  // Apply configuration settings to the greeter, respecting CLI overrides
+  pub fn apply_config(&mut self, config: &crate::config::Config) {
+    use crate::{config::SecretMode, ui::sessions::SessionSource};
+
+    // Only apply config values if CLI didn't override them
+    // General config
+    if !self.config().opt_present("debug") {
+      self.debug = config.general.debug;
+    }
+
+    // Session config
+    if !self.config().opt_present("cmd")
+      && config.session.command.is_some()
+      && let Some(ref cmd) = config.session.command
+    {
+      self.session_source = SessionSource::Command(cmd.clone());
+    }
+
+    if !self.config().opt_present("sessions")
+      && !config.session.sessions_dirs.is_empty()
+    {
+      self
+        .session_paths
+        .extend(config.session.sessions_dirs.iter().map(|dir| {
+          (
+            PathBuf::from(dir),
+            crate::ui::sessions::SessionType::Wayland,
+          )
+        }));
+    }
+
+    if !self.config().opt_present("xsessions")
+      && !config.session.xsessions_dirs.is_empty()
+    {
+      self
+        .session_paths
+        .extend(config.session.xsessions_dirs.iter().map(|dir| {
+          (PathBuf::from(dir), crate::ui::sessions::SessionType::X11)
+        }));
+    }
+
+    if !self.config().opt_present("session-wrapper")
+      && config.session.session_wrapper.is_some()
+    {
+      self.session_wrapper = config.session.session_wrapper.clone();
+    }
+
+    if !self.config().opt_present("xsession-wrapper")
+      && !self.config().opt_present("no-xsession-wrapper")
+    {
+      self.xsession_wrapper = config.session.xsession_wrapper.clone();
+    }
+
+    // Display config
+    if !self.config().opt_present("time") {
+      self.time = config.display.show_time;
+    }
+
+    if !self.config().opt_present("time-format")
+      && config.display.time_format.is_some()
+    {
+      self.time_format = config.display.time_format.clone();
+    }
+
+    if !self.config().opt_present("greeting")
+      && config.display.greeting.is_some()
+    {
+      self.greeting = config.display.greeting.clone();
+    }
+
+    if !self.config().opt_present("issue") {
+      // XXX: issue handling is done in parse_options, so we need to set
+      // greeting from issue there
+    }
+
+    // Remember config
+    if !self.config().opt_present("remember") {
+      self.remember = config.remember.username;
+    }
+
+    if !self.config().opt_present("remember-session") {
+      self.remember_session = config.remember.session;
+    }
+
+    if !self.config().opt_present("remember-user-session") {
+      self.remember_user_session = config.remember.user_session;
+    }
+
+    // User menu config
+    if !self.config().opt_present("user-menu") {
+      self.user_menu = config.user_menu.enabled;
+
+      // If user menu is enabled, set up the users
+      if self.user_menu {
+        use crate::info::get_users;
+        self.users = Menu {
+          title:    fl!("title_users"),
+          options:  get_users(
+            config.user_menu.min_uid,
+            config.user_menu.max_uid,
+          ),
+          selected: 0,
+        };
+      }
+    }
+
+    // Secret config
+    if !self.config().opt_present("asterisks") {
+      match config.secret.mode {
+        SecretMode::Hidden => self.secret_display = SecretDisplay::Hidden,
+        SecretMode::Characters => {
+          self.secret_display =
+            SecretDisplay::Character(config.secret.characters.clone());
+        },
+      }
+    }
+
+    // Keybindings config
+    if !self.config().opt_present("kb-command") {
+      self.kb_command = config.keybindings.command;
+    }
+    if !self.config().opt_present("kb-sessions") {
+      self.kb_sessions = config.keybindings.sessions;
+    }
+    if !self.config().opt_present("kb-power") {
+      self.kb_power = config.keybindings.power;
+    }
+  }
+
+  // Apply theme configuration
+  pub fn apply_theme_config(
+    &mut self,
+    theme_config: &crate::config::ThemeConfig,
+    cli_theme: Option<&str>,
+  ) {
+    use crate::config::theme::{apply_cli_theme, theme_from_config};
+
+    // Start with theme from config
+    let config_theme = theme_from_config(theme_config);
+
+    // Apply CLI theme override if present
+    self.theme = apply_cli_theme(config_theme, cli_theme);
   }
 }
 

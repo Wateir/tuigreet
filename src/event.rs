@@ -17,6 +17,7 @@ pub enum Event {
   Render,
   PowerCommand(Command),
   Exit(AuthStatus),
+  Refresh, // for config hot reload
 }
 
 pub struct Events {
