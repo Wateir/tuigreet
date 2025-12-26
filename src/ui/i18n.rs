@@ -2,21 +2,40 @@ use i18n_embed::{
   fluent::{fluent_language_loader, FluentLanguageLoader},
   DesktopLanguageRequester, LanguageLoader,
 };
-use lazy_static::lazy_static;
 use rust_embed::RustEmbed;
+use std::{
+  ops::Deref,
+  sync::OnceLock,
+};
 
 #[derive(RustEmbed)]
 #[folder = "contrib/locales"]
 struct Localizations;
 
-lazy_static! {
-  pub static ref MESSAGES: FluentLanguageLoader = {
-    let locales = Localizations;
-    let loader = fluent_language_loader!();
-    loader.load_languages(&locales, &[loader.fallback_language().clone()]).unwrap();
-
-    let _ = i18n_embed::select(&loader, &locales, &DesktopLanguageRequester::requested_languages());
-
-    loader
-  };
+pub struct LazyLoader {
+  once: OnceLock<FluentLanguageLoader>,
 }
+
+impl LazyLoader {
+  const fn new() -> Self {
+    Self { once: OnceLock::new() }
+  }
+}
+
+impl Deref for LazyLoader {
+  type Target = FluentLanguageLoader;
+
+  fn deref(&self) -> &Self::Target {
+    self.once.get_or_init(|| {
+      let locales = Localizations;
+      let loader = fluent_language_loader!();
+      loader.load_languages(&locales, &[loader.fallback_language().clone()]).unwrap();
+
+      let _ = i18n_embed::select(&loader, &locales, &DesktopLanguageRequester::requested_languages());
+
+      loader
+    })
+  }
+}
+
+pub static MESSAGES: LazyLoader = LazyLoader::new();

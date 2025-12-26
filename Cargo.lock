@@ -1698,7 +1698,6 @@ dependencies = [
  "greetd_ipc",
  "i18n-embed",
  "i18n-embed-fl",
- "lazy_static",
  "nix",
  "rand",
  "ratatui",

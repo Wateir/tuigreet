@@ -17,10 +17,12 @@ impl SafeDebug for Request {
 
 macro_rules! fl {
   ($message_id:literal) => {{
-    i18n_embed_fl::fl!($crate::ui::MESSAGES, $message_id).replace(&['\u{2068}', '\u{2069}'], "")
+    $crate::ui::MESSAGES.get($message_id).replace(&['\u{2068}', '\u{2069}'], "")
   }};
 
-  ($message_id:literal, $($args:expr),*) => {{
-    i18n_embed_fl::fl!($crate::ui::MESSAGES, $message_id, $($args),*).replace(&['\u{2068}', '\u{2069}'], "")
+  ($message_id:literal, $($key:ident = $value:expr),*) => {{
+    let mut args = std::collections::HashMap::new();
+    $(args.insert(stringify!($key), $value);)*
+    $crate::ui::MESSAGES.get_args($message_id, args).replace(&['\u{2068}', '\u{2069}'], "")
   }};
 }

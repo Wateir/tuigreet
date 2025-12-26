@@ -5,11 +5,11 @@ use std::{
   io::{self, BufRead, BufReader},
   path::{Path, PathBuf},
   process::Command,
+  sync::OnceLock,
 };
 
 use chrono::Local;
 use ini::Ini;
-use lazy_static::lazy_static;
 use nix::sys::utsname;
 use utmp_rs::{UtmpEntry, UtmpParser};
 use uzers::os::unix::UserExt;
@@ -31,16 +31,24 @@ const LAST_SESSION: &str = "/var/cache/tuigreet/lastsession-path";
 const DEFAULT_MIN_UID: u16 = 1000;
 const DEFAULT_MAX_UID: u16 = 60000;
 
-lazy_static! {
-  static ref XDG_DATA_DIRS: Vec<PathBuf> = {
+static XDG_DATA_DIRS: OnceLock<Vec<PathBuf>> = OnceLock::new();
+static DEFAULT_SESSION_PATHS: OnceLock<Vec<(PathBuf, SessionType)>> = OnceLock::new();
+
+fn xdg_data_dirs() -> &'static Vec<PathBuf> {
+  XDG_DATA_DIRS.get_or_init(|| {
     let value = env::var("XDG_DATA_DIRS").unwrap_or("/usr/local/share:/usr/share".to_string());
     env::split_paths(&value).filter(|p| p.is_absolute()).collect()
-  };
-  static ref DEFAULT_SESSION_PATHS: Vec<(PathBuf, SessionType)> = XDG_DATA_DIRS
-    .iter()
-    .map(|p| (p.join("wayland-sessions"), SessionType::Wayland))
-    .chain(XDG_DATA_DIRS.iter().map(|p| (p.join("xsessions"), SessionType::X11)))
-    .collect();
+  })
+}
+
+fn default_session_paths() -> &'static Vec<(PathBuf, SessionType)> {
+  DEFAULT_SESSION_PATHS.get_or_init(|| {
+    xdg_data_dirs()
+      .iter()
+      .map(|p| (p.join("wayland-sessions"), SessionType::Wayland))
+      .chain(xdg_data_dirs().iter().map(|p| (p.join("xsessions"), SessionType::X11)))
+      .collect()
+  })
 }
 
 pub fn get_hostname() -> String {
@@ -252,7 +260,7 @@ pub fn get_min_max_uids(min_uid: Option<u16>, max_uid: Option<u16>) -> (u16, u16
 
 pub fn get_sessions(greeter: &Greeter) -> Result<Vec<Session>, Box<dyn Error>> {
   let paths = if greeter.session_paths.is_empty() {
-    DEFAULT_SESSION_PATHS.as_ref()
+    default_session_paths()
   } else {
     &greeter.session_paths
   };
