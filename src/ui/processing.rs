@@ -11,11 +11,12 @@ use crate::{
   ui::{Frame, util::*},
 };
 
-pub fn draw(
+pub fn draw_with_area(
   greeter: &mut Greeter,
   f: &mut Frame,
+  area: Rect,
 ) -> Result<(u16, u16), Box<dyn Error>> {
-  let size = f.area();
+  let size = area;
 
   let width = greeter.width();
   let height: u16 = get_height(greeter) + 1;

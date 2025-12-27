@@ -12,13 +12,14 @@ use crate::{
   ui::{Frame, prompt_value, util::*},
 };
 
-pub fn draw(
+pub fn draw_with_area(
   greeter: &mut Greeter,
   f: &mut Frame,
+  area: Rect,
 ) -> Result<(u16, u16), Box<dyn Error>> {
   let theme = &greeter.theme;
 
-  let size = f.area();
+  let size = area;
   let (x, y, width, height) = get_rect_bounds(greeter, size, 0);
 
   let container_padding = greeter.container_padding();

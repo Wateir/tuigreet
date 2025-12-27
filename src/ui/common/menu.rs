@@ -34,14 +34,15 @@ impl<T> Menu<T>
 where
   T: MenuItem,
 {
-  pub fn draw(
+  pub fn draw_with_area(
     &self,
     greeter: &Greeter,
     f: &mut Frame,
+    area: Rect,
   ) -> Result<(u16, u16), Box<dyn Error>> {
     let theme = &greeter.theme;
 
-    let size = f.area();
+    let size = area;
     let (x, y, width, height) =
       get_rect_bounds(greeter, size, self.options.len());
 
