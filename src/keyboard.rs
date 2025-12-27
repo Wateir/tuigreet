@@ -56,8 +56,8 @@ pub async fn handle(
       }
     },
 
-    // In debug mode only, ^X will exit the application.
-    #[cfg(debug_assertions)]
+    // Exit handler for integration tests.
+    #[cfg(test)]
     KeyEvent {
       code: KeyCode::Char('x'),
       modifiers: KeyModifiers::CONTROL,
