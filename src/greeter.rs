@@ -944,7 +944,7 @@ impl Greeter {
       && config.session.command.is_some()
       && let Some(ref cmd) = config.session.command
     {
-      self.session_source = SessionSource::Command(cmd.clone());
+      self.session_source = SessionSource::DefaultCommand(cmd.clone(), None);
     }
 
     if !self.config().opt_present("sessions")
