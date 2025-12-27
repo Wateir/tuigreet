@@ -1023,15 +1023,26 @@ impl Greeter {
 
       // If user menu is enabled, set up the users
       if self.user_menu {
-        use crate::info::get_users;
-        self.users = Menu {
-          title:    fl!("title_users"),
-          options:  get_users(
+        // Validate UID range
+        if config.user_menu.min_uid >= config.user_menu.max_uid {
+          tracing::error!(
+            "Invalid UID range in config: min_uid ({}) must be less than \
+             max_uid ({}). Disabling user menu.",
             config.user_menu.min_uid,
-            config.user_menu.max_uid,
-          ),
-          selected: 0,
-        };
+            config.user_menu.max_uid
+          );
+          self.user_menu = false;
+        } else {
+          use crate::info::get_users;
+          self.users = Menu {
+            title:    fl!("title_users"),
+            options:  get_users(
+              config.user_menu.min_uid,
+              config.user_menu.max_uid,
+            ),
+            selected: 0,
+          };
+        }
       }
     }
 
