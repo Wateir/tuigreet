@@ -504,7 +504,7 @@ fn is_executable(path: &Path) -> bool {
   #[cfg(not(unix))]
   {
     // On non-Unix systems, just check if file exists
-    path.exists()
+    return path.exists();
   }
 
   false
