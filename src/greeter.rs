@@ -786,9 +786,9 @@ impl Greeter {
 
       tracing::info!("min/max UIDs are {}/{}", min_uid, max_uid);
 
-      if min_uid >= max_uid {
+      if min_uid > max_uid {
         return Err(
-          "Minimum UID ({min_uid}) must be less than maximum UID ({max_uid})"
+          "Minimum UID ({min_uid}) must not exceed maximum UID ({max_uid})"
             .into(),
         );
       }
@@ -1024,9 +1024,9 @@ impl Greeter {
       // If user menu is enabled, set up the users
       if self.user_menu {
         // Validate UID range
-        if config.user_menu.min_uid >= config.user_menu.max_uid {
+        if config.user_menu.min_uid > config.user_menu.max_uid {
           tracing::error!(
-            "Invalid UID range in config: min_uid ({}) must be less than \
+            "Invalid UID range in config: min_uid ({}) must not exceed \
              max_uid ({}). Disabling user menu.",
             config.user_menu.min_uid,
             config.user_menu.max_uid

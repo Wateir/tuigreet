@@ -299,9 +299,9 @@ impl Config {
     }
 
     // Check UID ranges
-    if self.user_menu.min_uid >= self.user_menu.max_uid {
+    if self.user_menu.min_uid > self.user_menu.max_uid {
       return Err(ConfigError::InvalidRange(
-        "user_menu.min_uid must be less than user_menu.max_uid".to_string(),
+        "user_menu.min_uid must not exceed user_menu.max_uid".to_string(),
       ));
     }
 
