@@ -1,12 +1,11 @@
+use std::{ops::Deref, sync::OnceLock};
+
 use i18n_embed::{
-  fluent::{fluent_language_loader, FluentLanguageLoader},
-  DesktopLanguageRequester, LanguageLoader,
+  DesktopLanguageRequester,
+  LanguageLoader,
+  fluent::{FluentLanguageLoader, fluent_language_loader},
 };
 use rust_embed::RustEmbed;
-use std::{
-  ops::Deref,
-  sync::OnceLock,
-};
 
 #[derive(RustEmbed)]
 #[folder = "contrib/locales"]
@@ -18,7 +17,9 @@ pub struct LazyLoader {
 
 impl LazyLoader {
   const fn new() -> Self {
-    Self { once: OnceLock::new() }
+    Self {
+      once: OnceLock::new(),
+    }
   }
 }
 
@@ -29,9 +30,15 @@ impl Deref for LazyLoader {
     self.once.get_or_init(|| {
       let locales = Localizations;
       let loader = fluent_language_loader!();
-      loader.load_languages(&locales, &[loader.fallback_language().clone()]).unwrap();
+      loader
+        .load_languages(&locales, &[loader.fallback_language().clone()])
+        .unwrap();
 
-      let _ = i18n_embed::select(&loader, &locales, &DesktopLanguageRequester::requested_languages());
+      let _ = i18n_embed::select(
+        &loader,
+        &locales,
+        &DesktopLanguageRequester::requested_languages(),
+      );
 
       loader
     })

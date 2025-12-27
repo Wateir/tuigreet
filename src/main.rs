@@ -1,9 +1,9 @@
-#[macro_use]
-extern crate smart_default;
+#[macro_use] extern crate smart_default;
 
 #[macro_use]
 mod macros;
 
+mod config;
 mod event;
 mod greeter;
 mod info;
@@ -12,24 +12,22 @@ mod keyboard;
 mod power;
 mod ui;
 
-#[cfg(test)]
-mod integration;
+#[cfg(test)] mod integration;
 
 use std::{error::Error, fs::OpenOptions, io, process, sync::Arc};
 
+#[cfg(not(test))]
+use crossterm::terminal::{EnterAlternateScreen, enable_raw_mode};
 use crossterm::{
   execute,
-  terminal::{disable_raw_mode, LeaveAlternateScreen},
+  terminal::{LeaveAlternateScreen, disable_raw_mode},
 };
 use event::Event;
 use greetd_ipc::Request;
 use power::PowerPostAction;
 use tokio::sync::RwLock;
 use tracing_appender::non_blocking::WorkerGuard;
-use tui::{backend::CrosstermBackend, Terminal};
-
-#[cfg(not(test))]
-use crossterm::terminal::{enable_raw_mode, EnterAlternateScreen};
+use tui::{Terminal, backend::CrosstermBackend};
 
 pub use self::greeter::*;
 use self::{event::Events, ipc::Ipc};
@@ -49,7 +47,11 @@ async fn main() {
   }
 }
 
-async fn run<B>(backend: B, mut greeter: Greeter, mut events: Events) -> Result<(), Box<dyn Error>>
+async fn run<B>(
+  backend: B,
+  mut greeter: Greeter,
+  mut events: Events,
+) -> Result<(), Box<dyn Error>>
 where
   B: tui::backend::Backend,
 {
@@ -73,7 +75,10 @@ where
   if greeter.remember && !greeter.username.value.is_empty() {
     greeter.working = true;
 
-    tracing::info!("creating remembered session for user {}", greeter.username.value);
+    tracing::info!(
+      "creating remembered session for user {}",
+      greeter.username.value
+    );
 
     ipc
       .send(Request::CreateSession {
@@ -83,6 +88,30 @@ where
   }
 
   let greeter = Arc::new(RwLock::new(greeter));
+
+  // Initialize config watcher for hot reloading
+  #[cfg(not(test))]
+  let _config_watcher = {
+    let config_path = {
+      let greeter_guard = greeter.read().await;
+      greeter_guard
+        .config()
+        .opt_str("config")
+        .map(std::path::PathBuf::from)
+    };
+
+    match crate::config::watcher::ConfigWatcher::new(
+      config_path,
+      greeter.clone(),
+      events.sender(),
+    ) {
+      Ok(watcher) => Some(watcher),
+      Err(e) => {
+        tracing::warn!("Failed to initialize config watcher: {}", e);
+        None
+      },
+    }
+  };
 
   tokio::task::spawn({
     let greeter = greeter.clone();
@@ -104,14 +133,18 @@ where
 
     match events.next().await {
       Some(Event::Render) => ui::draw(greeter.clone(), &mut terminal).await?,
-      Some(Event::Key(key)) => keyboard::handle(greeter.clone(), key, ipc.clone()).await?,
+      Some(Event::Key(key)) => {
+        keyboard::handle(greeter.clone(), key, ipc.clone()).await?
+      },
 
       Some(Event::Exit(status)) => {
         crate::exit(&mut *greeter.write().await, status).await;
-      }
+      },
 
       Some(Event::PowerCommand(command)) => {
-        if let PowerPostAction::ClearScreen = power::run(&greeter, command).await {
+        if let PowerPostAction::ClearScreen =
+          power::run(&greeter, command).await
+        {
           execute!(io::stdout(), LeaveAlternateScreen)?;
           terminal.set_cursor_position((1, 1))?;
           terminal.clear()?;
@@ -119,9 +152,14 @@ where
 
           break;
         }
-      }
+      },
 
-      _ => {}
+      Some(Event::Refresh) => {
+        // Config was hot reloaded, force a render
+        ui::draw(greeter.clone(), &mut terminal).await?
+      },
+
+      _ => {},
     }
   }
 
@@ -132,7 +170,7 @@ async fn exit(greeter: &mut Greeter, status: AuthStatus) {
   tracing::info!("preparing exit with status {}", status);
 
   match status {
-    AuthStatus::Success => {}
+    AuthStatus::Success => {},
     AuthStatus::Cancel | AuthStatus::Failure => Ipc::cancel(greeter).await,
   }
 
@@ -170,10 +208,16 @@ pub fn clear_screen() {
 }
 
 fn init_logger(greeter: &Greeter) -> Option<WorkerGuard> {
-  use tracing_subscriber::filter::{LevelFilter, Targets};
-  use tracing_subscriber::prelude::*;
+  use tracing_subscriber::{
+    filter::{LevelFilter, Targets},
+    prelude::*,
+  };
 
-  let logfile = OpenOptions::new().write(true).create(true).append(true).clone();
+  let logfile = OpenOptions::new()
+    .write(true)
+    .create(true)
+    .append(true)
+    .clone();
 
   match (greeter.debug, logfile.open(&greeter.logfile)) {
     (true, Ok(file)) => {
@@ -181,12 +225,16 @@ fn init_logger(greeter: &Greeter) -> Option<WorkerGuard> {
       let target = Targets::new().with_target("tuigreet", LevelFilter::DEBUG);
 
       tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer().with_writer(appender).with_line_number(true))
+        .with(
+          tracing_subscriber::fmt::layer()
+            .with_writer(appender)
+            .with_line_number(true),
+        )
         .with(target)
         .init();
 
       Some(guard)
-    }
+    },
 
     _ => None,
   }

@@ -7,15 +7,14 @@ use tui::{
   widgets::{Block, BorderType, Borders, Paragraph},
 };
 
-use crate::{
-  ui::{
-    util::{get_rect_bounds, titleize},
-    Frame,
-  },
-  Greeter,
-};
-
 use super::style::Themed;
+use crate::{
+  Greeter,
+  ui::{
+    Frame,
+    util::{get_rect_bounds, titleize},
+  },
+};
 
 pub trait MenuItem {
   fn format(&self) -> Cow<'_, str>;
@@ -26,8 +25,8 @@ pub struct Menu<T>
 where
   T: MenuItem,
 {
-  pub title: String,
-  pub options: Vec<T>,
+  pub title:    String,
+  pub options:  Vec<T>,
   pub selected: usize,
 }
 
@@ -35,11 +34,17 @@ impl<T> Menu<T>
 where
   T: MenuItem,
 {
-  pub fn draw(&self, greeter: &Greeter, f: &mut Frame) -> Result<(u16, u16), Box<dyn Error>> {
+  pub fn draw_with_area(
+    &self,
+    greeter: &Greeter,
+    f: &mut Frame,
+    area: Rect,
+  ) -> Result<(u16, u16), Box<dyn Error>> {
     let theme = &greeter.theme;
 
-    let size = f.area();
-    let (x, y, width, height) = get_rect_bounds(greeter, size, self.options.len());
+    let size = area;
+    let (x, y, width, height) =
+      get_rect_bounds(greeter, size, self.options.len());
 
     let container = Rect::new(x, y, width, height);
 
@@ -73,7 +78,10 @@ where
     S: Into<String>,
   {
     if self.selected == index {
-      Span::styled(name.into(), Style::default().add_modifier(Modifier::REVERSED))
+      Span::styled(
+        name.into(),
+        Style::default().add_modifier(Modifier::REVERSED),
+      )
     } else {
       Span::from(name.into())
     }

@@ -24,22 +24,24 @@ pub enum Themed {
 #[derive(Default)]
 pub struct Theme {
   container: Option<(Component, Color)>,
-  time: Option<(Component, Color)>,
-  text: Option<(Component, Color)>,
-  border: Option<(Component, Color)>,
-  title: Option<(Component, Color)>,
-  greet: Option<(Component, Color)>,
-  prompt: Option<(Component, Color)>,
-  input: Option<(Component, Color)>,
-  action: Option<(Component, Color)>,
-  button: Option<(Component, Color)>,
+  time:      Option<(Component, Color)>,
+  text:      Option<(Component, Color)>,
+  border:    Option<(Component, Color)>,
+  title:     Option<(Component, Color)>,
+  greet:     Option<(Component, Color)>,
+  prompt:    Option<(Component, Color)>,
+  input:     Option<(Component, Color)>,
+  action:    Option<(Component, Color)>,
+  button:    Option<(Component, Color)>,
 }
 
 impl Theme {
   pub fn parse(spec: &str) -> Theme {
     use Component::*;
 
-    let directives = spec.split(';').filter_map(|directive| directive.split_once('='));
+    let directives = spec
+      .split(';')
+      .filter_map(|directive| directive.split_once('='));
     let mut style = Theme::default();
 
     for (key, value) in directives {
@@ -55,7 +57,7 @@ impl Theme {
           "input" => style.input = Some((Fg, color)),
           "action" => style.action = Some((Fg, color)),
           "button" => style.button = Some((Fg, color)),
-          _ => {}
+          _ => {},
         }
       }
     }
@@ -77,7 +79,9 @@ impl Theme {
   }
 
   pub fn of(&self, targets: &[Themed]) -> Style {
-    targets.iter().fold(Style::default(), |style, target| self.apply(style, target))
+    targets
+      .iter()
+      .fold(Style::default(), |style, target| self.apply(style, target))
   }
 
   fn apply(&self, style: Style, target: &Themed) -> Style {
@@ -97,9 +101,11 @@ impl Theme {
     };
 
     match color {
-      Some((component, color)) => match component {
-        Component::Fg => style.fg(*color),
-        Component::Bg => style.bg(*color),
+      Some((component, color)) => {
+        match component {
+          Component::Fg => style.fg(*color),
+          Component::Bg => style.bg(*color),
+        }
       },
 
       None => style,

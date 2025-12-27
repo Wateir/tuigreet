@@ -1,19 +1,18 @@
 use crossterm::event::{KeyCode, KeyModifiers};
 use libgreetd_stub::SessionOptions;
 
+use super::common::IntegrationRunner;
 use crate::{
   power::PowerOption,
   ui::{common::menu::Menu, power::Power, sessions::Session, users::User},
 };
-
-use super::common::IntegrationRunner;
 
 #[tokio::test]
 async fn menus_labels_default() {
   let opts = SessionOptions {
     username: "apognu".to_string(),
     password: "password".to_string(),
-    mfa: false,
+    mfa:      false,
   };
 
   let mut runner = IntegrationRunner::new(opts, None).await;
@@ -38,7 +37,7 @@ async fn menus_labels_with_custom_bindings() {
   let opts = SessionOptions {
     username: "apognu".to_string(),
     password: "password".to_string(),
-    mfa: false,
+    mfa:      false,
   };
 
   let mut runner = IntegrationRunner::new(
@@ -71,7 +70,7 @@ async fn change_command() {
   let opts = SessionOptions {
     username: "apognu".to_string(),
     password: "password".to_string(),
-    mfa: false,
+    mfa:      false,
   };
 
   let mut runner = IntegrationRunner::new(opts, None).await;
@@ -92,7 +91,9 @@ async fn change_command() {
       assert!(runner.output().await.contains("Change session command"));
       assert!(runner.output().await.contains("New command: uname"));
 
-      runner.send_modified_key(KeyCode::Char('u'), KeyModifiers::CONTROL).await;
+      runner
+        .send_modified_key(KeyCode::Char('u'), KeyModifiers::CONTROL)
+        .await;
       runner.send_text("mynewcommand").await;
       runner.send_key(KeyCode::Enter).await;
       runner.wait_for_render().await;
@@ -109,15 +110,15 @@ async fn session_menu() {
   let opts = SessionOptions {
     username: "apognu".to_string(),
     password: "password".to_string(),
-    mfa: false,
+    mfa:      false,
   };
 
   let mut runner = IntegrationRunner::new(
     opts,
     Some(|greeter| {
       greeter.sessions = Menu::<Session> {
-        title: "List of sessions".to_string(),
-        options: vec![
+        title:    "List of sessions".to_string(),
+        options:  vec![
           Session {
             name: "My Session".to_string(),
             ..Default::default()
@@ -171,15 +172,15 @@ async fn power_menu() {
   let opts = SessionOptions {
     username: "apognu".to_string(),
     password: "password".to_string(),
-    mfa: false,
+    mfa:      false,
   };
 
   let mut runner = IntegrationRunner::new(
     opts,
     Some(|greeter| {
       greeter.powers = Menu::<Power> {
-        title: "What to do?".to_string(),
-        options: vec![
+        title:    "What to do?".to_string(),
+        options:  vec![
           Power {
             action: PowerOption::Shutdown,
             label: "Turn it off".to_string(),
@@ -219,7 +220,7 @@ async fn users_menu() {
   let opts = SessionOptions {
     username: "apognu".to_string(),
     password: "password".to_string(),
-    mfa: false,
+    mfa:      false,
   };
 
   let mut runner = IntegrationRunner::new(
@@ -227,15 +228,15 @@ async fn users_menu() {
     Some(|greeter| {
       greeter.user_menu = true;
       greeter.users = Menu::<User> {
-        title: "The users".to_string(),
-        options: vec![
+        title:    "The users".to_string(),
+        options:  vec![
           User {
             username: "apognu".to_string(),
-            name: Some("Antoine POPINEAU".to_string()),
+            name:     Some("Antoine POPINEAU".to_string()),
           },
           User {
             username: "bob".to_string(),
-            name: Some("Bob JOE".to_string()),
+            name:     Some("Bob JOE".to_string()),
           },
         ],
         selected: 0,

@@ -1,17 +1,32 @@
 use std::{borrow::Cow, error::Error, sync::Arc};
 
-use greetd_ipc::{codec::TokioCodec, AuthMessageType, ErrorType, Request, Response};
+use greetd_ipc::{
+  AuthMessageType,
+  ErrorType,
+  Request,
+  Response,
+  codec::TokioCodec,
+};
 use tokio::sync::{
+  Mutex,
+  RwLock,
   mpsc::{Receiver, Sender},
-  Mutex, RwLock,
 };
 
 use crate::{
+  AuthStatus,
+  Greeter,
+  Mode,
   event::Event,
-  info::{delete_last_user_command, delete_last_user_session, write_last_user_command, write_last_user_session, write_last_username},
+  info::{
+    delete_last_user_command,
+    delete_last_user_session,
+    write_last_user_command,
+    write_last_user_session,
+    write_last_username,
+  },
   macros::SafeDebug,
   ui::sessions::{Session, SessionSource, SessionType},
-  AuthStatus, Greeter, Mode,
 };
 
 #[derive(Clone)]
@@ -42,7 +57,10 @@ impl Ipc {
     self.0.rx.lock().await.recv().await
   }
 
-  pub async fn handle(&mut self, greeter: Arc<RwLock<Greeter>>) -> Result<(), Box<dyn Error>> {
+  pub async fn handle(
+    &mut self,
+    greeter: Arc<RwLock<Greeter>>,
+  ) -> Result<(), Box<dyn Error>> {
     let request = self.next().await;
 
     if let Some(request) = request {
@@ -62,55 +80,73 @@ impl Ipc {
         response
       };
 
-      self.parse_response(&mut *greeter.write().await, response).await?;
+      self
+        .parse_response(&mut *greeter.write().await, response)
+        .await?;
     }
 
     Ok(())
   }
 
-  async fn parse_response(&mut self, greeter: &mut Greeter, response: Response) -> Result<(), Box<dyn Error>> {
-    // Do not display actual message from greetd, which may contain entered information, sometimes passwords.
+  async fn parse_response(
+    &mut self,
+    greeter: &mut Greeter,
+    response: Response,
+  ) -> Result<(), Box<dyn Error>> {
+    // Do not display actual message from greetd, which may contain entered
+    // information, sometimes passwords.
     match response {
-      Response::Error { ref error_type, .. } => tracing::info!("received greetd error message: {error_type:?}"),
+      Response::Error { ref error_type, .. } => {
+        tracing::info!("received greetd error message: {error_type:?}")
+      },
       ref response => tracing::info!("received greetd message: {:?}", response),
     }
 
     match response {
-      Response::AuthMessage { auth_message_type, auth_message } => match auth_message_type {
-        AuthMessageType::Secret => {
-          greeter.mode = Mode::Password;
-          greeter.working = false;
-          greeter.asking_for_secret = true;
-          greeter.set_prompt(&auth_message);
-        }
+      Response::AuthMessage {
+        auth_message_type,
+        auth_message,
+      } => {
+        match auth_message_type {
+          AuthMessageType::Secret => {
+            greeter.mode = Mode::Password;
+            greeter.working = false;
+            greeter.asking_for_secret = true;
+            greeter.set_prompt(&auth_message);
+          },
 
-        AuthMessageType::Visible => {
-          greeter.mode = Mode::Password;
-          greeter.working = false;
-          greeter.asking_for_secret = false;
-          greeter.set_prompt(&auth_message);
-        }
+          AuthMessageType::Visible => {
+            greeter.mode = Mode::Password;
+            greeter.working = false;
+            greeter.asking_for_secret = false;
+            greeter.set_prompt(&auth_message);
+          },
 
-        AuthMessageType::Error => {
-          greeter.message = Some(auth_message);
+          AuthMessageType::Error => {
+            greeter.message = Some(auth_message);
 
-          self.send(Request::PostAuthMessageResponse { response: None }).await;
-        }
+            self
+              .send(Request::PostAuthMessageResponse { response: None })
+              .await;
+          },
 
-        AuthMessageType::Info => {
-          greeter.remove_prompt();
+          AuthMessageType::Info => {
+            greeter.remove_prompt();
 
-          greeter.previous_mode = greeter.mode;
-          greeter.mode = Mode::Action;
+            greeter.previous_mode = greeter.mode;
+            greeter.mode = Mode::Action;
 
-          if let Some(message) = &mut greeter.message {
-            message.push('\n');
-            message.push_str(auth_message.trim_end());
-          } else {
-            greeter.message = Some(auth_message.trim_end().to_string());
-          }
+            if let Some(message) = &mut greeter.message {
+              message.push('\n');
+              message.push_str(auth_message.trim_end());
+            } else {
+              greeter.message = Some(auth_message.trim_end().to_string());
+            }
 
-          self.send(Request::PostAuthMessageResponse { response: None }).await;
+            self
+              .send(Request::PostAuthMessageResponse { response: None })
+              .await;
+          },
         }
       },
 
@@ -130,18 +166,27 @@ impl Ipc {
 
                   write_last_user_command(&greeter.username.value, command);
                   delete_last_user_session(&greeter.username.value);
-                }
+                },
 
                 SessionSource::Session(index) => {
-                  if let Some(Session { path: Some(session_path), .. }) = greeter.sessions.options.get(index) {
-                    tracing::info!("caching last user session: {session_path:?}");
+                  if let Some(Session {
+                    path: Some(session_path),
+                    ..
+                  }) = greeter.sessions.options.get(index)
+                  {
+                    tracing::info!(
+                      "caching last user session: {session_path:?}"
+                    );
 
-                    write_last_user_session(&greeter.username.value, session_path);
+                    write_last_user_session(
+                      &greeter.username.value,
+                      session_path,
+                    );
                     delete_last_user_command(&greeter.username.value);
                   }
-                }
+                },
 
-                _ => {}
+                _ => {},
               }
             }
           }
@@ -158,39 +203,52 @@ impl Ipc {
 
               greeter.message = Some(fl!("command_missing"));
               greeter.reset(false).await;
-            }
+            },
 
             Some(command) if command.is_empty() => {
               Ipc::cancel(greeter).await;
 
               greeter.message = Some(fl!("command_missing"));
               greeter.reset(false).await;
-            }
+            },
 
             Some(command) => {
               greeter.done = true;
               greeter.mode = Mode::Processing;
 
               let session = Session::get_selected(greeter);
-              let default = DefaultCommand(&command, greeter.session_source.env());
-              let (command, env) = wrap_session_command(greeter, session, &default);
+              let default =
+                DefaultCommand(&command, greeter.session_source.env());
+              let (command, env) =
+                wrap_session_command(greeter, session, &default);
 
               #[cfg(not(debug_assertions))]
-              self.send(Request::StartSession { cmd: vec![command.to_string()], env }).await;
+              self
+                .send(Request::StartSession {
+                  cmd: vec![command.to_string()],
+                  env,
+                })
+                .await;
 
               #[cfg(debug_assertions)]
               {
                 let _ = command;
 
-                self.send(Request::StartSession { cmd: vec!["true".to_string()], env }).await;
+                self
+                  .send(Request::StartSession {
+                    cmd: vec!["true".to_string()],
+                    env,
+                  })
+                  .await;
               }
-            }
+            },
           }
         }
-      }
+      },
 
       Response::Error { error_type, .. } => {
-        // Do not display actual message from greetd, which may contain entered information, sometimes passwords.
+        // Do not display actual message from greetd, which may contain entered
+        // information, sometimes passwords.
         tracing::info!("received an error from greetd: {error_type:?}");
 
         Ipc::cancel(greeter).await;
@@ -204,15 +262,17 @@ impl Ipc {
               })
               .await;
             greeter.reset(true).await;
-          }
+          },
 
           ErrorType::Error => {
-            // Do not display actual message from greetd, which may contain entered information, sometimes passwords.
-            greeter.message = Some("An error was received from greetd".to_string());
+            // Do not display actual message from greetd, which may contain
+            // entered information, sometimes passwords.
+            greeter.message =
+              Some("An error was received from greetd".to_string());
             greeter.reset(false).await;
-          }
+          },
         }
-      }
+      },
     }
 
     Ok(())
@@ -221,7 +281,9 @@ impl Ipc {
   pub async fn cancel(greeter: &mut Greeter) {
     tracing::info!("cancelling session");
 
-    let _ = Request::CancelSession.write_to(&mut *greeter.stream().await).await;
+    let _ = Request::CancelSession
+      .write_to(&mut *greeter.stream().await)
+      .await;
   }
 }
 
@@ -241,7 +303,11 @@ impl<'a> DefaultCommand<'a> {
   }
 }
 
-fn wrap_session_command<'a>(greeter: &Greeter, session: Option<&Session>, default: &'a DefaultCommand<'a>) -> (Cow<'a, str>, Vec<String>) {
+fn wrap_session_command<'a>(
+  greeter: &Greeter,
+  session: Option<&Session>,
+  default: &'a DefaultCommand<'a>,
+) -> (Cow<'a, str>, Vec<String>) {
   let mut env: Vec<String> = vec![];
 
   match session {
@@ -258,10 +324,16 @@ fn wrap_session_command<'a>(greeter: &Greeter, session: Option<&Session>, defaul
         env.push(format!("DESKTOP_SESSION={slug}"));
       }
       if *session_type != SessionType::None {
-        env.push(format!("XDG_SESSION_TYPE={}", session_type.as_xdg_session_type()));
+        env.push(format!(
+          "XDG_SESSION_TYPE={}",
+          session_type.as_xdg_session_type()
+        ));
       }
       if let Some(xdg_desktop_names) = xdg_desktop_names {
-        env.push(format!("XDG_CURRENT_DESKTOP={}", desktop_names_to_xdg(xdg_desktop_names)));
+        env.push(format!(
+          "XDG_CURRENT_DESKTOP={}",
+          desktop_names_to_xdg(xdg_desktop_names)
+        ));
       }
 
       if *session_type == SessionType::X11 {
@@ -271,7 +343,7 @@ fn wrap_session_command<'a>(greeter: &Greeter, session: Option<&Session>, defaul
       } else if let Some(ref wrap) = greeter.session_wrapper {
         return (Cow::Owned(format!("{} {}", wrap, default.command())), env);
       }
-    }
+    },
 
     _ => {
       // If a wrapper script is used, assume that it is able to set up the
@@ -283,7 +355,7 @@ fn wrap_session_command<'a>(greeter: &Greeter, session: Option<&Session>, defaul
       if let Some(base_env) = default.env() {
         env.append(&mut base_env.clone());
       }
-    }
+    },
   }
 
   (Cow::Borrowed(default.command()), env)
@@ -293,13 +365,12 @@ fn wrap_session_command<'a>(greeter: &Greeter, session: Option<&Session>, defaul
 mod test {
   use std::path::PathBuf;
 
-  use crate::{
-    ipc::{desktop_names_to_xdg, DefaultCommand},
-    ui::sessions::{Session, SessionType},
-    Greeter,
-  };
-
   use super::wrap_session_command;
+  use crate::{
+    Greeter,
+    ipc::{DefaultCommand, desktop_names_to_xdg},
+    ui::sessions::{Session, SessionType},
+  };
 
   #[test]
   fn wayland_no_wrapper() {
@@ -314,7 +385,8 @@ mod test {
     };
 
     let default = DefaultCommand(&session.command, None);
-    let (command, env) = wrap_session_command(&greeter, Some(&session), &default);
+    let (command, env) =
+      wrap_session_command(&greeter, Some(&session), &default);
 
     assert_eq!(command.as_ref(), "Session1Cmd");
     assert_eq!(env, vec!["XDG_SESSION_TYPE=wayland"]);
@@ -334,7 +406,8 @@ mod test {
     };
 
     let default = DefaultCommand(&session.command, None);
-    let (command, env) = wrap_session_command(&greeter, Some(&session), &default);
+    let (command, env) =
+      wrap_session_command(&greeter, Some(&session), &default);
 
     assert_eq!(command.as_ref(), "/wrapper.sh Session1Cmd");
     assert_eq!(env, vec!["XDG_SESSION_TYPE=wayland"]);
@@ -343,7 +416,7 @@ mod test {
   #[test]
   fn x11_wrapper() {
     let mut greeter = Greeter::default();
-    greeter.xsession_wrapper = Some("startx /usr/bin/env".into());
+    greeter.xsession_wrapper = Some("startx".into());
 
     let session = Session {
       slug: Some("thede".to_string()),
@@ -356,18 +429,24 @@ mod test {
     };
 
     let default = DefaultCommand(&session.command, None);
-    let (command, env) = wrap_session_command(&greeter, Some(&session), &default);
+    let (command, env) =
+      wrap_session_command(&greeter, Some(&session), &default);
 
-    assert_eq!(command.as_ref(), "startx /usr/bin/env Session1Cmd");
-    assert_eq!(
-      env,
-      vec!["XDG_SESSION_DESKTOP=thede", "DESKTOP_SESSION=thede", "XDG_SESSION_TYPE=x11", "XDG_CURRENT_DESKTOP=one:two:three"]
-    );
+    assert_eq!(command.as_ref(), "startx Session1Cmd");
+    assert_eq!(env, vec![
+      "XDG_SESSION_DESKTOP=thede",
+      "DESKTOP_SESSION=thede",
+      "XDG_SESSION_TYPE=x11",
+      "XDG_CURRENT_DESKTOP=one:two:three"
+    ]);
   }
 
   #[test]
   fn xdg_current_desktop() {
-    assert_eq!(desktop_names_to_xdg("one;two;three four"), "one:two:three four");
+    assert_eq!(
+      desktop_names_to_xdg("one;two;three four"),
+      "one:two:three four"
+    );
     assert_eq!(desktop_names_to_xdg("one;"), "one");
     assert_eq!(desktop_names_to_xdg(""), "");
     assert_eq!(desktop_names_to_xdg(";"), "");

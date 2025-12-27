@@ -3,9 +3,8 @@ use std::{
   path::{Path, PathBuf},
 };
 
-use crate::Greeter;
-
 use super::common::menu::MenuItem;
+use crate::Greeter;
 
 // SessionSource models the selected session and where it comes from.
 //
@@ -27,23 +26,41 @@ impl SessionSource {
   //
   // For free-form commands, this is the command itself. For session files, it
   // is the value of the `Name` attribute in that file.
-  pub fn label<'g, 'ss: 'g>(&'ss self, greeter: &'g Greeter) -> Option<&'g str> {
+  pub fn label<'g, 'ss: 'g>(
+    &'ss self,
+    greeter: &'g Greeter,
+  ) -> Option<&'g str> {
     match self {
       SessionSource::None => None,
       SessionSource::DefaultCommand(command, _) => Some(command),
       SessionSource::Command(command) => Some(command),
-      SessionSource::Session(index) => greeter.sessions.options.get(*index).map(|session| session.name.as_str()),
+      SessionSource::Session(index) => {
+        greeter
+          .sessions
+          .options
+          .get(*index)
+          .map(|session| session.name.as_str())
+      },
     }
   }
 
   // Returns the command that should be spawned when the selected session is
   // started.
-  pub fn command<'g, 'ss: 'g>(&'ss self, greeter: &'g Greeter) -> Option<&'g str> {
+  pub fn command<'g, 'ss: 'g>(
+    &'ss self,
+    greeter: &'g Greeter,
+  ) -> Option<&'g str> {
     match self {
       SessionSource::None => None,
       SessionSource::DefaultCommand(command, _) => Some(command.as_str()),
       SessionSource::Command(command) => Some(command.as_str()),
-      SessionSource::Session(index) => greeter.sessions.options.get(*index).map(|session| session.command.as_str()),
+      SessionSource::Session(index) => {
+        greeter
+          .sessions
+          .options
+          .get(*index)
+          .map(|session| session.command.as_str())
+      },
     }
   }
 
@@ -85,17 +102,17 @@ impl SessionType {
 pub struct Session {
   // Slug of the session, being the name of the desktop file without its
   // extension.
-  pub slug: Option<String>,
+  pub slug:              Option<String>,
   // Human-friendly name for the session, maps to the `Name` attribute.
-  pub name: String,
+  pub name:              String,
   // Command used to start the session, maps to the `Exec` attribute.
-  pub command: String,
-  // XDG session type for the session, detected from the location of the session
-  // file.
-  pub session_type: SessionType,
+  pub command:           String,
+  // XDG session type for the session, detected from the location of the
+  // session file.
+  pub session_type:      SessionType,
   // Path to the session file. Used to uniquely identify sessions, since names
   // and commands can be identital between two different sessions.
-  pub path: Option<PathBuf>,
+  pub path:              Option<PathBuf>,
   // Desktop names as defined with the `DesktopNames` desktop file property
   pub xdg_desktop_names: Option<String>,
 }
@@ -115,7 +132,11 @@ impl Session {
   where
     P: AsRef<Path>,
   {
-    greeter.sessions.options.iter().find(|session| session.path.as_deref() == Some(path.as_ref()))
+    greeter
+      .sessions
+      .options
+      .iter()
+      .find(|session| session.path.as_deref() == Some(path.as_ref()))
   }
 
   // Retrieves the `Session` that is currently selected.
@@ -133,11 +154,11 @@ impl Session {
 #[cfg(test)]
 mod test {
   use crate::{
+    Greeter,
     ui::{
       common::menu::Menu,
       sessions::{Session, SessionSource, SessionType},
     },
-    Greeter,
   };
 
   #[test]
@@ -146,9 +167,9 @@ mod test {
     greeter.session_source = SessionSource::Session(1);
 
     greeter.sessions = Menu::<Session> {
-      title: "Sessions".into(),
+      title:    "Sessions".into(),
       selected: 1,
-      options: vec![
+      options:  vec![
         Session {
           name: "Session1".into(),
           command: "Session1Cmd".into(),
@@ -179,9 +200,9 @@ mod test {
     greeter.session_source = SessionSource::Session(1);
 
     greeter.sessions = Menu::<Session> {
-      title: "Sessions".into(),
+      title:    "Sessions".into(),
       selected: 1,
-      options: vec![Session {
+      options:  vec![Session {
         name: "Session1".into(),
         command: "Session1Cmd".into(),
         session_type: super::SessionType::Wayland,
@@ -208,9 +229,9 @@ mod test {
     greeter.session_source = SessionSource::Session(1);
 
     greeter.sessions = Menu::<Session> {
-      title: "Sessions".into(),
+      title:    "Sessions".into(),
       selected: 1,
-      options: vec![
+      options:  vec![
         Session {
           name: "Session1".into(),
           command: "Session1Cmd".into(),
@@ -241,9 +262,9 @@ mod test {
     greeter.session_source = SessionSource::Session(1);
 
     greeter.sessions = Menu::<Session> {
-      title: "Sessions".into(),
+      title:    "Sessions".into(),
       selected: 1,
-      options: vec![
+      options:  vec![
         Session {
           name: "Session".into(),
           command: "Session1Cmd".into(),

@@ -6,24 +6,31 @@ use tui::{
   widgets::{Block, BorderType, Borders, Paragraph},
 };
 
+use super::common::style::Themed;
 use crate::{
-  ui::util::*,
-  ui::{prompt_value, Frame},
   Greeter,
+  ui::{Frame, prompt_value, util::*},
 };
 
-use super::common::style::Themed;
-
-pub fn draw(greeter: &mut Greeter, f: &mut Frame) -> Result<(u16, u16), Box<dyn Error>> {
+pub fn draw_with_area(
+  greeter: &mut Greeter,
+  f: &mut Frame,
+  area: Rect,
+) -> Result<(u16, u16), Box<dyn Error>> {
   let theme = &greeter.theme;
 
-  let size = f.area();
+  let size = area;
   let (x, y, width, height) = get_rect_bounds(greeter, size, 0);
 
   let container_padding = greeter.container_padding();
 
   let container = Rect::new(x, y, width, height);
-  let frame = Rect::new(x + container_padding, y + container_padding, width - container_padding, height - container_padding);
+  let frame = Rect::new(
+    x + container_padding,
+    y + container_padding,
+    width - container_padding,
+    height - container_padding,
+  );
 
   let block = Block::default()
     .title(titleize(&fl!("title_command")))
@@ -39,13 +46,18 @@ pub fn draw(greeter: &mut Greeter, f: &mut Frame) -> Result<(u16, u16), Box<dyn 
     Constraint::Length(1), // Username
   ];
 
-  let chunks = Layout::default().direction(Direction::Vertical).constraints(constraints.as_ref()).split(frame);
+  let chunks = Layout::default()
+    .direction(Direction::Vertical)
+    .constraints(constraints.as_ref())
+    .split(frame);
   let cursor = chunks[0];
 
   let command_label_text = prompt_value(theme, Some(fl!("new_command")));
-  let command_label = Paragraph::new(command_label_text).style(theme.of(&[Themed::Prompt]));
+  let command_label =
+    Paragraph::new(command_label_text).style(theme.of(&[Themed::Prompt]));
   let command_value_text = Span::from(&greeter.buffer);
-  let command_value = Paragraph::new(command_value_text).style(theme.of(&[Themed::Input]));
+  let command_value =
+    Paragraph::new(command_value_text).style(theme.of(&[Themed::Input]));
 
   f.render_widget(command_label, chunks[0]);
   f.render_widget(
@@ -61,5 +73,8 @@ pub fn draw(greeter: &mut Greeter, f: &mut Frame) -> Result<(u16, u16), Box<dyn 
   let new_command = greeter.buffer.clone();
   let offset = get_cursor_offset(greeter, new_command.chars().count());
 
-  Ok((2 + cursor.x + fl!("new_command").chars().count() as u16 + offset as u16, cursor.y + 1))
+  Ok((
+    2 + cursor.x + fl!("new_command").chars().count() as u16 + offset as u16,
+    cursor.y + 1,
+  ))
 }

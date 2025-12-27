@@ -20,7 +20,14 @@ impl Output {
 
   pub fn debug_inspect(&self) {
     for line in self.lines() {
-      println!("{:?}", line.as_bytes().iter().map(|c| *c as char).collect::<Vec<char>>());
+      println!(
+        "{:?}",
+        line
+          .as_bytes()
+          .iter()
+          .map(|c| *c as char)
+          .collect::<Vec<char>>()
+      );
     }
   }
 }
