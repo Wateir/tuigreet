@@ -5,6 +5,7 @@ pub mod power;
 mod processing;
 mod prompt;
 pub mod sessions;
+#[cfg(test)] mod tests;
 pub mod users;
 mod util;
 
