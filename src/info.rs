@@ -10,7 +10,6 @@ use std::{
 
 use chrono::Local;
 use ini::Ini;
-use nix::sys::utsname;
 use utmp_rs::{UtmpEntry, UtmpParser};
 use uzers::os::unix::UserExt;
 
@@ -60,7 +59,7 @@ fn default_session_paths() -> &'static Vec<(PathBuf, SessionType)> {
 }
 
 pub fn get_hostname() -> String {
-  match utsname::uname() {
+  match nix::sys::utsname::uname() {
     Ok(uts) => uts.nodename().to_str().unwrap_or("").to_string(),
     _ => String::new(),
   }
@@ -92,11 +91,11 @@ pub fn get_issue() -> Option<String> {
     n => format!("{n} users"),
   };
 
+  let uts = nix::sys::utsname::uname();
   let vtnr: usize = env::var("XDG_VTNR")
     .unwrap_or_else(|_| "0".to_string())
     .parse()
     .unwrap_or(0);
-  let uts = utsname::uname();
 
   if let Ok(issue) = fs::read_to_string("/etc/issue") {
     let issue = issue

@@ -3,6 +3,7 @@
 #[macro_use]
 mod macros;
 
+mod config;
 mod event;
 mod greeter;
 mod info;
@@ -88,6 +89,30 @@ where
 
   let greeter = Arc::new(RwLock::new(greeter));
 
+  // Initialize config watcher for hot reloading
+  #[cfg(not(test))]
+  let _config_watcher = {
+    let config_path = {
+      let greeter_guard = greeter.read().await;
+      greeter_guard
+        .config()
+        .opt_str("config")
+        .map(std::path::PathBuf::from)
+    };
+
+    match crate::config::watcher::ConfigWatcher::new(
+      config_path,
+      greeter.clone(),
+      events.sender(),
+    ) {
+      Ok(watcher) => Some(watcher),
+      Err(e) => {
+        tracing::warn!("Failed to initialize config watcher: {}", e);
+        None
+      },
+    }
+  };
+
   tokio::task::spawn({
     let greeter = greeter.clone();
     let mut ipc = ipc.clone();
@@ -127,6 +152,11 @@ where
 
           break;
         }
+      },
+
+      Some(Event::Refresh) => {
+        // Config was hot reloaded, force a render
+        ui::draw(greeter.clone(), &mut terminal).await?
       },
 
       _ => {},
