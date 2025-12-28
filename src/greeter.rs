@@ -25,9 +25,16 @@ use zeroize::Zeroize;
 use crate::{
   event::Event,
   info::{
-    get_issue, get_last_command, get_last_session_path, get_last_user_command,
-    get_last_user_name, get_last_user_session, get_last_user_username,
-    get_min_max_uids, get_sessions, get_users,
+    get_issue,
+    get_last_command,
+    get_last_session_path,
+    get_last_user_command,
+    get_last_user_name,
+    get_last_user_session,
+    get_last_user_username,
+    get_min_max_uids,
+    get_sessions,
+    get_users,
   },
   power::PowerOption,
   ui::{
@@ -107,19 +114,20 @@ pub enum GreetAlign {
 
 #[derive(SmartDefault)]
 pub struct Greeter {
-  pub debug: bool,
+  pub debug:   bool,
   pub logfile: String,
-  pub logger: Option<WorkerGuard>,
+  pub logger:  Option<WorkerGuard>,
+
   #[default(DEFAULT_LOCALE)]
-  pub locale: Locale,
-  pub config: Option<Matches>,
+  pub locale:        Locale,
+  pub config:        Option<Matches>,
   pub loaded_config: Option<crate::config::Config>, // store loaded TOML config
-  pub socket: String,
-  pub stream: Option<Arc<RwLock<UnixStream>>>,
-  pub events: Option<Sender<Event>>,
+  pub socket:        String,
+  pub stream:        Option<Arc<RwLock<UnixStream>>>,
+  pub events:        Option<Sender<Event>>,
 
   // Current mode of the application, will define what actions are permitted.
-  pub mode: Mode,
+  pub mode:          Mode,
   // Mode the application will return to when exiting the current mode.
   pub previous_mode: Mode,
   // Offset the cursor should be at from its base position for the current
@@ -130,72 +138,69 @@ pub struct Greeter {
   // Previous buffer is saved when a transient screen has to use the buffer, to
   // be able to restore it when leaving the transient screen.
   pub previous_buffer: Option<String>,
-  pub buffer: String,
+  pub buffer:          String,
 
   // Define the selected session and how to resolve it.
-  pub session_source: SessionSource,
+  pub session_source:   SessionSource,
   // List of session files found on disk.
-  pub session_paths: Vec<(PathBuf, SessionType)>,
+  pub session_paths:    Vec<(PathBuf, SessionType)>,
   // Menu for session selection.
-  pub sessions: Menu<Session>,
+  pub sessions:         Menu<Session>,
   // Wrapper command to prepend to non-X11 sessions.
-  pub session_wrapper: Option<String>,
+  pub session_wrapper:  Option<String>,
   // Wrapper command to prepend to X11 sessions.
   pub xsession_wrapper: Option<String>,
 
   // Whether user menu is enabled.
   pub user_menu: bool,
   // Menu for user selection.
-  pub users: Menu<User>,
+  pub users:     Menu<User>,
   // Current username. Masked to display the full name if available.
-  pub username: MaskedString,
+  pub username:  MaskedString,
   // Prompt that should be displayed to ask for entry.
-  pub prompt: Option<String>,
+  pub prompt:    Option<String>,
 
   // Whether the current edition prompt should be hidden.
   pub asking_for_secret: bool,
   // How should secrets be displayed?
-  pub secret_display: SecretDisplay,
+  pub secret_display:    SecretDisplay,
 
   // Whether last logged-in user should be remembered.
-  pub remember: bool,
+  pub remember:              bool,
   // Whether last launched session (regardless of user) should be remembered.
-  pub remember_session: bool,
+  pub remember_session:      bool,
   // Whether last launched session for the current user should be remembered.
   pub remember_user_session: bool,
 
   // Style object for the terminal UI
-  pub theme: Theme,
+  pub theme:       Theme,
   // Display the current time
-  pub time: bool,
+  pub time:        bool,
   // Time format
   pub time_format: Option<String>,
   // Greeting message (MOTD) to use to welcome the user.
-  pub greeting: Option<String>,
+  pub greeting:    Option<String>,
   // Transaction message to show to the user.
-  pub message: Option<String>,
+  pub message:     Option<String>,
 
   // Menu for power options.
-  pub powers: Menu<Power>,
+  pub powers:       Menu<Power>,
   // Whether to prefix the power commands with `setsid`.
   pub power_setsid: bool,
 
   #[default(2)]
-  pub kb_command: u8,
+  pub kb_command:  u8,
   #[default(3)]
   pub kb_sessions: u8,
   #[default(12)]
-  pub kb_power: u8,
+  pub kb_power:    u8,
 
   // The software is waiting for a response from `greetd`.
   pub working: bool,
   // We are done working.
-  pub done: bool,
+  pub done:    bool,
   // Should we exit?
-  pub exit: Option<AuthStatus>,
-
-  // Should we silence command output?
-  pub silent: bool,
+  pub exit:    Option<AuthStatus>,
 }
 
 impl Drop for Greeter {
@@ -212,8 +217,8 @@ impl Greeter {
     greeter.set_locale();
 
     greeter.powers = Menu {
-      title: fl!("title_power"),
-      options: Default::default(),
+      title:    fl!("title_power"),
+      options:  Default::default(),
       selected: 0,
     };
 
@@ -304,8 +309,8 @@ impl Greeter {
     }
 
     greeter.sessions = Menu {
-      title: fl!("title_session"),
-      options: sessions,
+      title:    fl!("title_session"),
+      options:  sessions,
       selected: 0,
     };
 
@@ -798,8 +803,8 @@ impl Greeter {
       }
 
       self.users = Menu {
-        title: fl!("title_users"),
-        options: get_users(min_uid, max_uid),
+        title:    fl!("title_users"),
+        options:  get_users(min_uid, max_uid),
         selected: 0,
       };
 
@@ -874,14 +879,14 @@ impl Greeter {
     }
 
     self.powers.options.push(Power {
-      action: PowerOption::Shutdown,
-      label: fl!("shutdown"),
+      action:  PowerOption::Shutdown,
+      label:   fl!("shutdown"),
       command: self.config().opt_str("power-shutdown"),
     });
 
     self.powers.options.push(Power {
-      action: PowerOption::Reboot,
-      label: fl!("reboot"),
+      action:  PowerOption::Reboot,
+      label:   fl!("reboot"),
       command: self.config().opt_str("power-reboot"),
     });
 
@@ -986,6 +991,8 @@ impl Greeter {
       self.xsession_wrapper = config.session.xsession_wrapper.clone();
     }
 
+     self.silent = self.config().opt_present("silent");
+
     // Display config
     if !self.config().opt_present("time") {
       self.time = config.display.show_time;
@@ -1039,8 +1046,8 @@ impl Greeter {
         } else {
           use crate::info::get_users;
           self.users = Menu {
-            title: fl!("title_users"),
-            options: get_users(
+            title:    fl!("title_users"),
+            options:  get_users(
               config.user_menu.min_uid,
               config.user_menu.max_uid,
             ),
@@ -1093,8 +1100,6 @@ impl Greeter {
       if !self.config().opt_present("kb-power") {
         self.kb_power = 12;
       }
-
-      self.silent = self.config().opt_present("silent");
     }
   }
 
